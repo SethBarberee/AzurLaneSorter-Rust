@@ -10,11 +10,185 @@ use std::{
 };
 use strum_macros::EnumString;
 
-use terminal_menu::{menu, label, button, run, mut_menu};
+use terminal_menu::{button, label, menu, mut_menu, run};
 
-use serde::{Deserialize, Serialize};
 use getopts::Options;
+use serde::{Deserialize, Serialize};
 
+use iced::widget::button::Button;
+use iced::widget::row;
+use iced::widget::column;
+use iced::widget::radio;
+use iced::widget::image;
+use iced::{Sandbox, Settings};
+
+#[derive(Debug, Clone)]
+enum Message {
+    ImportShips,
+    SortShips,
+    ClearLines,
+    FrontlineSort(SortChoice),
+    BacklineSort(SortChoice),
+    SublineSort(SortChoice),
+    // ImportAll
+}
+
+struct GUI {
+    map: HashMap<i32, Ship>,
+    backline: Vec<Ship>,
+    frontline: Vec<Ship>,
+    subline: Vec<Ship>,
+    import_all: bool, // whether to import all or use the include.txt
+    frontline_sort: SortChoice,
+    backline_sort: SortChoice,
+    subline_sort: SortChoice,
+}
+
+impl Sandbox for GUI {
+    type Message = Message;
+
+    fn theme(&self) -> iced::Theme {
+        iced::Theme::default()
+    }
+
+    fn style(&self) -> iced::theme::Application {
+        iced::theme::Application::default()
+    }
+
+    fn scale_factor(&self) -> f64 {
+        1.0
+    }
+
+    fn run(settings: iced::Settings<()>) -> Result<(), iced::Error>
+    where
+        Self: 'static + Sized,
+    {
+        <Self as iced::Application>::run(settings)
+    }
+
+    fn new() -> Self {
+        GUI {
+            map: HashMap::new(),
+            backline: Vec::new(),
+            subline: Vec::new(),
+            frontline: Vec::new(),
+            import_all: false,
+            frontline_sort: SortChoice::HP,
+            subline_sort: SortChoice::HP,
+            backline_sort: SortChoice::HP,
+        }
+    }
+
+    fn title(&self) -> String {
+        String::from("Azur Lane Sorter")
+    }
+
+    fn update(&mut self, message: Message) {
+        match message {
+            // TODO add more stuff here
+            Message::SortShips => {
+                (self.backline, self.frontline, self.subline) = find_line(self.map.clone());
+                // TODO use controls to actually sort rather than just putting them in the
+                // lines
+                println!("{:?}", self.frontline[0]);
+                println!("{:?}", self.frontline[1]);
+                println!("{:?}", self.frontline[2]);
+
+                println!("{:?}", self.subline[0]);
+                println!("{:?}", self.subline[1]);
+                println!("{:?}", self.subline[2]);
+
+                println!("{:?}", self.frontline[0]);
+                println!("{:?}", self.frontline[1]);
+                println!("{:?}", self.frontline[2]);
+            }
+            Message::ImportShips => {
+                self.map = read_ships_from_file("data_export.json").unwrap();
+            }
+            Message::ClearLines => {
+                // Reset the lines but don't clear the map
+                self.backline = Vec::new();
+                self.frontline = Vec::new();
+                self.subline = Vec::new();
+            }
+            Message::FrontlineSort(choice) => self.frontline_sort = choice,
+            Message::BacklineSort(choice) => self.backline_sort = choice,
+            Message::SublineSort(choice) => self.subline_sort = choice,
+        }
+    }
+
+    fn view(&self) -> iced::Element<'_, Self::Message> {
+        let selected_choice = Some(SortChoice::HP);
+
+        // TODO make the buttons fill the screen
+        let controls = column![
+            Button::new("Import Ships").on_press(Message::ImportShips),
+            Button::new("Sort Ships").on_press(Message::SortShips),
+            Button::new("Clear Lines").on_press(Message::ClearLines),
+        ];
+
+        let image_test: image::Handle = image::Handle::from_path("test.png");
+
+        column![
+            controls,
+            row![
+                image::viewer(image_test.clone()),
+                image::viewer(image_test.clone()),
+                image::viewer(image_test.clone()),
+            ],
+            row(SortChoice::all()
+                .iter()
+                .copied()
+                .map(|sort_choice| {
+                    radio(
+                        sort_choice,
+                        sort_choice,
+                        selected_choice,
+                        Message::FrontlineSort,
+                    )
+                })
+                .map(iced::Element::from)
+                .collect()),
+            row![
+                image::viewer(image_test.clone()),
+                image::viewer(image_test.clone()),
+                image::viewer(image_test.clone()),
+            ],
+            row(SortChoice::all()
+                .iter()
+                .copied()
+                .map(|sort_choice| {
+                    radio(
+                        sort_choice,
+                        sort_choice,
+                        selected_choice,
+                        Message::BacklineSort,
+                    )
+                })
+                .map(iced::Element::from)
+                .collect()),
+            row![
+                image::viewer(image_test.clone()),
+                image::viewer(image_test.clone()),
+                image::viewer(image_test.clone()),
+            ],
+            row(SortChoice::all()
+                .iter()
+                .copied()
+                .map(|sort_choice| {
+                    radio(
+                        sort_choice,
+                        sort_choice,
+                        selected_choice,
+                        Message::SublineSort,
+                    )
+                })
+                .map(iced::Element::from)
+                .collect())
+        ]
+        .into()
+    }
+}
 
 #[derive(Debug, PartialEq, EnumString, Deserialize, Serialize, Clone, Eq, PartialOrd, Ord)]
 enum Armor {
@@ -23,7 +197,7 @@ enum Armor {
     Light,
 }
 
-#[derive(Debug, PartialEq, EnumString, Deserialize, Serialize, Clone, Eq, PartialOrd, Ord )]
+#[derive(Debug, PartialEq, EnumString, Deserialize, Serialize, Clone, Eq, PartialOrd, Ord)]
 enum Class {
     BB,
     BBV,
@@ -44,12 +218,11 @@ enum Class {
 }
 
 #[derive(Debug, PartialEq, EnumString, Deserialize, Serialize, Clone)]
-enum ValidLevel
-{
+enum ValidLevel {
     Level1,
     Level100,
     Level120,
-    Level125
+    Level125,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -77,11 +250,10 @@ struct Ship {
     image: String,
 }
 
-#[derive(EnumString)]
-enum SortChoice
-{
-    Nation,
-    Class,
+#[derive(EnumString, Debug, Clone, Eq, PartialEq, Copy)]
+enum SortChoice {
+    //Nation,
+    //Class,
     Luck,
     Armor,
     Speed,
@@ -98,6 +270,47 @@ enum SortChoice
     Accuracy,
 }
 
+impl SortChoice {
+    fn all() -> [SortChoice; 14] {
+        [
+            SortChoice::HP,
+            SortChoice::Luck,
+            SortChoice::Armor,
+            SortChoice::Speed,
+            SortChoice::Firepower,
+            SortChoice::AntiAir,
+            SortChoice::Torpedo,
+            SortChoice::Evasion,
+            SortChoice::Cost,
+            SortChoice::Reload,
+            SortChoice::AntiSubmarine,
+            SortChoice::Oxygen,
+            SortChoice::Ammunition,
+            SortChoice::Accuracy,
+        ]
+    }
+}
+
+impl From<SortChoice> for String {
+    fn from(sort_choice: SortChoice) -> String {
+        String::from(match sort_choice {
+            SortChoice::HP => "HP",
+            SortChoice::Luck => "Luck",
+            SortChoice::Armor => "Armor",
+            SortChoice::Speed => "Speed",
+            SortChoice::Firepower => "Firepower",
+            SortChoice::AntiAir => "AntiAir",
+            SortChoice::Torpedo => "Torpedo",
+            SortChoice::Evasion => "Evasion",
+            SortChoice::Cost => "Cost",
+            SortChoice::Reload => "Reload",
+            SortChoice::AntiSubmarine => "AntiSubmarine",
+            SortChoice::Oxygen => "Oxygen",
+            SortChoice::Ammunition => "Ammunition",
+            SortChoice::Accuracy => "Accuracy",
+        })
+    }
+}
 
 // TODO beter handling for improper JSON
 #[allow(dead_code)]
@@ -120,9 +333,7 @@ fn read_ships_from_file<P: AsRef<Path>>(path: P) -> Result<HashMap<i32, Ship>, B
 }
 
 fn sort_ships(line: &mut Vec<Ship>, choice: SortChoice) -> &Vec<Ship> {
-
-    match choice
-    {
+    match choice {
         SortChoice::HP => line.sort_by(|a, b| b.hp.cmp(&a.hp)),
         SortChoice::Luck => line.sort_by(|a, b| b.luck.cmp(&a.luck)),
         SortChoice::Armor => line.sort_by(|a, b| b.armor.cmp(&a.armor)),
@@ -134,10 +345,9 @@ fn sort_ships(line: &mut Vec<Ship>, choice: SortChoice) -> &Vec<Ship> {
         SortChoice::Evasion => line.sort_by(|a, b| b.evasion.cmp(&a.evasion)),
         SortChoice::AntiSubmarine => line.sort_by(|a, b| b.antisubmarine.cmp(&a.antisubmarine)),
         SortChoice::AntiAir => line.sort_by(|a, b| b.antiair.cmp(&a.antiair)),
-        SortChoice::Oxygen=> line.sort_by(|a, b| b.oxygen.cmp(&a.oxygen)),
+        SortChoice::Oxygen => line.sort_by(|a, b| b.oxygen.cmp(&a.oxygen)),
         SortChoice::Ammunition => line.sort_by(|a, b| b.ammunition.cmp(&a.ammunition)),
         SortChoice::Accuracy => line.sort_by(|a, b| b.accuracy.cmp(&a.accuracy)),
-        _ => line.sort(),
     }
 
     line
@@ -257,85 +467,81 @@ fn export_json<P: AsRef<Path>>(path: P, all_lines: &mut Vec<Ship>) -> std::io::R
     Ok(())
 }
 
-fn print_usage(program : &str, opts: Options){
+fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
     print!("{}", opts.usage(&brief));
 }
 
-fn main() {
-
+fn main() -> iced::Result {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
     let mut opts = Options::new();
     opts.optflag("g", "gui", "use GUI");
     opts.optflag("h", "help", "help menu");
 
-    let matches = match opts.parse(&args[1..]){
-        Ok(m) => { m }
-        Err(_) => todo!()
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => m,
+        Err(_) => todo!(),
     };
 
-    if matches.opt_present("h")
-    {
+    if matches.opt_present("h") {
         print_usage(&program, opts);
-        return;
+        return iced::Result::Ok(());
     }
 
-    if matches.opt_present("g")
-    {
+    if matches.opt_present("g") {
         // TODO GUI stuff here
-        panic!("TODO GUI STUFF");
-    }
-    else {
+        GUI::run(Settings::default())
+    } else {
         loop {
             let mut map: HashMap<i32, Ship> = HashMap::new();
             let main_menu = menu(vec![
                 label("1) Read Ships into program"),
                 label("2) Scrape wiki"),
-
                 button("1"),
                 button("2"),
-                button("Quit")
+                button("Quit"),
             ]);
 
             run(&main_menu);
 
-            match mut_menu(&main_menu).selected_item_name()  {
+            match mut_menu(&main_menu).selected_item_name() {
                 "1" => {
                     map = read_ships_from_file("data_export.json").unwrap();
                     let (backline, frontline, subline) = find_line(map);
 
-                    for mut vec in [backline, frontline, subline]
-                    {
+                    for mut vec in [backline, frontline, subline] {
                         let selection_menu = menu(vec![
-                                button("Luck"),
-                                button("Armor"),
-                                button("Speed"),
-                                button("HP"),
-                                button("Firepower"),
-                                button("AntiAir"),
-                                button("Torpedo"),
-                                button("Evasion"),
-                                button("Cost"),
-                                button("Reload"),
-                                button("AntiSubmarine"),
-                                button("Oxygen"),
-                                button("Ammunition"),
-                                button("Accuracy"),
+                            button("Luck"),
+                            button("Armor"),
+                            button("Speed"),
+                            button("HP"),
+                            button("Firepower"),
+                            button("AntiAir"),
+                            button("Torpedo"),
+                            button("Evasion"),
+                            button("Cost"),
+                            button("Reload"),
+                            button("AntiSubmarine"),
+                            button("Oxygen"),
+                            button("Ammunition"),
+                            button("Accuracy"),
                         ]);
 
                         run(&selection_menu);
 
-                        sort_ships(&mut vec, SortChoice::from_str(mut_menu(&selection_menu).selected_item_name()).unwrap());
+                        sort_ships(
+                            &mut vec,
+                            SortChoice::from_str(mut_menu(&selection_menu).selected_item_name())
+                                .unwrap(),
+                        );
 
                         println!("{:?}", vec[0]);
                         println!("{:?}", vec[1]);
                         println!("{:?}", vec[2]);
                     }
-
-                } 
+                }
                 "2" => {
-
                     let wiki_menu = menu(vec![
                         button("Level1"),
                         button("Level100"),
@@ -345,12 +551,15 @@ fn main() {
 
                     run(&wiki_menu);
 
-                    let level = match ValidLevel::from_str(mut_menu(&wiki_menu).selected_item_name()).unwrap() {
-                        ValidLevel::Level1 => 1,
-                        ValidLevel::Level100 => 100,
-                        ValidLevel::Level120 => 120,
-                        ValidLevel::Level125 => 125,
-                    };
+                    let level =
+                        match ValidLevel::from_str(mut_menu(&wiki_menu).selected_item_name())
+                            .unwrap()
+                        {
+                            ValidLevel::Level1 => 1,
+                            ValidLevel::Level100 => 100,
+                            ValidLevel::Level120 => 120,
+                            ValidLevel::Level125 => 125,
+                        };
 
                     let _ = scrape_wiki(&mut map, level);
                     let (mut backline, mut frontline, mut subline) = find_line(map);
@@ -368,5 +577,6 @@ fn main() {
                 }
             };
         }
+        return iced::Result::Ok(());
     }
 }
