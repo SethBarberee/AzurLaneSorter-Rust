@@ -1,4 +1,5 @@
 use reqwest;
+use core::fmt;
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
@@ -16,11 +17,13 @@ use getopts::Options;
 use serde::{Deserialize, Serialize};
 
 use iced::widget::button::Button;
-use iced::widget::row;
+use iced::widget::{row, Checkbox, pick_list};
 use iced::widget::column;
 use iced::widget::radio;
 use iced::widget::image;
 use iced::{Sandbox, Settings};
+use iced::Alignment;
+use iced::Length;
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -30,7 +33,10 @@ enum Message {
     FrontlineSort(SortChoice),
     BacklineSort(SortChoice),
     SublineSort(SortChoice),
-    // ImportAll
+    ImportAllToggle(bool),
+    FrontlineClassFilter(Class),
+    BacklineClassFilter(Class),
+    SublineClassFilter(Class),
 }
 
 struct GUI {
@@ -40,15 +46,18 @@ struct GUI {
     subline: Vec<Ship>,
     import_all: bool, // whether to import all or use the include.txt
     frontline_sort: SortChoice,
+    frontline_class_filter: Option<Class>,
     backline_sort: SortChoice,
+    backline_class_filter: Option<Class>,
     subline_sort: SortChoice,
+    subline_class_filter: Option<Class>,
 }
 
 impl Sandbox for GUI {
     type Message = Message;
 
     fn theme(&self) -> iced::Theme {
-        iced::Theme::default()
+        iced::Theme::Dark
     }
 
     fn style(&self) -> iced::theme::Application {
@@ -76,6 +85,9 @@ impl Sandbox for GUI {
             frontline_sort: SortChoice::HP,
             subline_sort: SortChoice::HP,
             backline_sort: SortChoice::HP,
+            frontline_class_filter: None,
+            backline_class_filter: None,
+            subline_class_filter: None,
         }
     }
 
@@ -114,27 +126,34 @@ impl Sandbox for GUI {
             Message::FrontlineSort(choice) => self.frontline_sort = choice,
             Message::BacklineSort(choice) => self.backline_sort = choice,
             Message::SublineSort(choice) => self.subline_sort = choice,
+            Message::ImportAllToggle(toggle) => self.import_all = toggle,
+            Message::FrontlineClassFilter(class) => self.frontline_class_filter = Some(class),
+            Message::BacklineClassFilter(class) => self.backline_class_filter = Some(class),
+            Message::SublineClassFilter(class) => self.subline_class_filter = Some(class),
         }
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
-        let selected_choice = Some(SortChoice::HP);
 
         // TODO make the buttons fill the screen
         let controls = column![
             Button::new("Import Ships").on_press(Message::ImportShips),
             Button::new("Sort Ships").on_press(Message::SortShips),
             Button::new("Clear Lines").on_press(Message::ClearLines),
-        ];
+        ]
+        .align_items(Alignment::Center)
+        .width(Length::Fill);
 
         let image_test: image::Handle = image::Handle::from_path("test.png");
 
         column![
             controls,
+            Checkbox::new("Import All", self.import_all, Message::ImportAllToggle),
             row![
                 image::viewer(image_test.clone()),
                 image::viewer(image_test.clone()),
                 image::viewer(image_test.clone()),
+                pick_list(&Class::ALL[..], self.frontline_class_filter.clone(), Message::FrontlineClassFilter)
             ],
             row(SortChoice::all()
                 .iter()
@@ -143,7 +162,7 @@ impl Sandbox for GUI {
                     radio(
                         sort_choice,
                         sort_choice,
-                        selected_choice,
+                        Some(self.frontline_sort),
                         Message::FrontlineSort,
                     )
                 })
@@ -153,6 +172,7 @@ impl Sandbox for GUI {
                 image::viewer(image_test.clone()),
                 image::viewer(image_test.clone()),
                 image::viewer(image_test.clone()),
+                pick_list(&Class::ALL[..], self.backline_class_filter.clone(), Message::BacklineClassFilter)
             ],
             row(SortChoice::all()
                 .iter()
@@ -161,7 +181,7 @@ impl Sandbox for GUI {
                     radio(
                         sort_choice,
                         sort_choice,
-                        selected_choice,
+                        Some(self.backline_sort),
                         Message::BacklineSort,
                     )
                 })
@@ -171,6 +191,7 @@ impl Sandbox for GUI {
                 image::viewer(image_test.clone()),
                 image::viewer(image_test.clone()),
                 image::viewer(image_test.clone()),
+                pick_list(&Class::ALL[..], self.subline_class_filter.clone(), Message::SublineClassFilter)
             ],
             row(SortChoice::all()
                 .iter()
@@ -179,7 +200,7 @@ impl Sandbox for GUI {
                     radio(
                         sort_choice,
                         sort_choice,
-                        selected_choice,
+                        Some(self.subline_sort),
                         Message::SublineSort,
                     )
                 })
@@ -217,6 +238,50 @@ enum Class {
     IX,
 }
 
+impl fmt::Display for Class {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Class::BB => write!(f, "BB"),
+            Class::BBV => write!(f, "BBV"),
+            Class::BC =>  write!(f, "BBC"),
+            Class::BM =>  write!(f, "BM"),
+            Class::CV =>  write!(f, "CV"),
+            Class::CVL => write!(f, "CVL"),
+            Class::AR => write!(f, "AR"),
+            Class::AE => write!(f, "AE"),
+            Class::CL => write!(f, "CL"),
+            Class::CA => write!(f, "CA"),
+            Class::CB => write!(f, "CB"),
+            Class::DD => write!(f, "DD"),
+            Class::SS => write!(f, "SS"),
+            Class::AM => write!(f, "AM"),
+            Class::SSV => write!(f, "SSV"),
+            Class::IX => write!(f, "IX"),
+        }
+    }
+}
+
+impl Class {
+    const ALL: [Class; 16] = [
+        Class::BB,
+        Class::BBV,
+        Class::BC,
+        Class::BM,
+        Class::CV,
+        Class::CVL,
+        Class::AR,
+        Class::AE,
+        Class::CL,
+        Class::CA,
+        Class::CB,
+        Class::DD,
+        Class::SS,
+        Class::AM,
+        Class::SSV,
+        Class::IX,
+    ];
+}
+
 #[derive(Debug, PartialEq, EnumString, Deserialize, Serialize, Clone)]
 enum ValidLevel {
     Level1,
@@ -252,8 +317,6 @@ struct Ship {
 
 #[derive(EnumString, Debug, Clone, Eq, PartialEq, Copy)]
 enum SortChoice {
-    //Nation,
-    //Class,
     Luck,
     Armor,
     Speed,
