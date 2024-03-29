@@ -1,5 +1,5 @@
-use reqwest;
 use core::fmt;
+use reqwest;
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
@@ -17,13 +17,13 @@ use getopts::Options;
 use serde::{Deserialize, Serialize};
 
 use iced::widget::button::Button;
-use iced::widget::{row, Checkbox, pick_list};
 use iced::widget::column;
-use iced::widget::radio;
 use iced::widget::image;
-use iced::{Sandbox, Settings};
+use iced::widget::radio;
+use iced::widget::{pick_list, row, Checkbox};
 use iced::Alignment;
 use iced::Length;
+use iced::{Sandbox, Settings};
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -134,12 +134,20 @@ impl Sandbox for GUI {
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
-
         // TODO make the buttons fill the screen
         let controls = column![
-            Button::new("Import Ships").on_press(Message::ImportShips),
-            Button::new("Sort Ships").on_press(Message::SortShips),
-            Button::new("Clear Lines").on_press(Message::ClearLines),
+            Button::new("Import Ships")
+                .on_press(Message::ImportShips)
+                .width(Length::Fill)
+                .padding(10),
+            Button::new("Sort Ships")
+                .on_press(Message::SortShips)
+                .width(Length::Fill)
+                .padding(10),
+            Button::new("Clear Lines")
+                .on_press(Message::ClearLines)
+                .width(Length::Fill)
+                .padding(10),
         ]
         .align_items(Alignment::Center)
         .width(Length::Fill);
@@ -153,26 +161,11 @@ impl Sandbox for GUI {
                 image::viewer(image_test.clone()),
                 image::viewer(image_test.clone()),
                 image::viewer(image_test.clone()),
-                pick_list(&Class::ALL[..], self.frontline_class_filter.clone(), Message::FrontlineClassFilter)
-            ],
-            row(SortChoice::all()
-                .iter()
-                .copied()
-                .map(|sort_choice| {
-                    radio(
-                        sort_choice,
-                        sort_choice,
-                        Some(self.frontline_sort),
-                        Message::FrontlineSort,
-                    )
-                })
-                .map(iced::Element::from)
-                .collect()),
-            row![
-                image::viewer(image_test.clone()),
-                image::viewer(image_test.clone()),
-                image::viewer(image_test.clone()),
-                pick_list(&Class::ALL[..], self.backline_class_filter.clone(), Message::BacklineClassFilter)
+                pick_list(
+                    &Class::BACK[..],
+                    self.backline_class_filter.clone(),
+                    Message::BacklineClassFilter
+                )
             ],
             row(SortChoice::all()
                 .iter()
@@ -191,7 +184,34 @@ impl Sandbox for GUI {
                 image::viewer(image_test.clone()),
                 image::viewer(image_test.clone()),
                 image::viewer(image_test.clone()),
-                pick_list(&Class::ALL[..], self.subline_class_filter.clone(), Message::SublineClassFilter)
+                pick_list(
+                    &Class::FRONT[..],
+                    self.frontline_class_filter.clone(),
+                    Message::FrontlineClassFilter
+                )
+            ],
+            row(SortChoice::all()
+                .iter()
+                .copied()
+                .map(|sort_choice| {
+                    radio(
+                        sort_choice,
+                        sort_choice,
+                        Some(self.frontline_sort),
+                        Message::FrontlineSort,
+                    )
+                })
+                .map(iced::Element::from)
+                .collect()),
+            row![
+                image::viewer(image_test.clone()),
+                image::viewer(image_test.clone()),
+                image::viewer(image_test.clone()),
+                pick_list(
+                    &Class::SUB[..],
+                    self.subline_class_filter.clone(),
+                    Message::SublineClassFilter
+                )
             ],
             row(SortChoice::all()
                 .iter()
@@ -243,9 +263,9 @@ impl fmt::Display for Class {
         match *self {
             Class::BB => write!(f, "BB"),
             Class::BBV => write!(f, "BBV"),
-            Class::BC =>  write!(f, "BBC"),
-            Class::BM =>  write!(f, "BM"),
-            Class::CV =>  write!(f, "CV"),
+            Class::BC => write!(f, "BBC"),
+            Class::BM => write!(f, "BM"),
+            Class::CV => write!(f, "CV"),
             Class::CVL => write!(f, "CVL"),
             Class::AR => write!(f, "AR"),
             Class::AE => write!(f, "AE"),
@@ -262,7 +282,9 @@ impl fmt::Display for Class {
 }
 
 impl Class {
-    const ALL: [Class; 16] = [
+    const SUB: [Class; 4] = [Class::SS, Class::AM, Class::SSV, Class::IX];
+    const FRONT: [Class; 4] = [Class::CL, Class::CA, Class::CB, Class::DD];
+    const BACK: [Class; 8] = [
         Class::BB,
         Class::BBV,
         Class::BC,
@@ -271,14 +293,6 @@ impl Class {
         Class::CVL,
         Class::AR,
         Class::AE,
-        Class::CL,
-        Class::CA,
-        Class::CB,
-        Class::DD,
-        Class::SS,
-        Class::AM,
-        Class::SSV,
-        Class::IX,
     ];
 }
 
