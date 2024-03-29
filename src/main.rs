@@ -21,9 +21,10 @@ use iced::widget::column;
 use iced::widget::image;
 use iced::widget::radio;
 use iced::widget::{pick_list, row, Checkbox};
+use iced::widget::text;
+use iced::{Sandbox, Settings};
 use iced::Alignment;
 use iced::Length;
-use iced::{Sandbox, Settings};
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -44,6 +45,9 @@ struct GUI {
     backline: Vec<Ship>,
     frontline: Vec<Ship>,
     subline: Vec<Ship>,
+    backline_img: Vec<image::Handle>,
+    frontline_img: Vec<image::Handle>,
+    subline_img: Vec<image::Handle>,
     import_all: bool, // whether to import all or use the include.txt
     frontline_sort: SortChoice,
     frontline_class_filter: Option<Class>,
@@ -76,6 +80,8 @@ impl Sandbox for GUI {
     }
 
     fn new() -> Self {
+        let image_test: image::Handle = image::Handle::from_path("test.png");
+
         GUI {
             map: HashMap::new(),
             backline: Vec::new(),
@@ -88,6 +94,9 @@ impl Sandbox for GUI {
             frontline_class_filter: None,
             backline_class_filter: None,
             subline_class_filter: None,
+            backline_img: vec![image_test.clone(); 3],
+            frontline_img: vec![image_test.clone(); 3],
+            subline_img: vec![image_test.clone(); 3],
         }
     }
 
@@ -97,22 +106,39 @@ impl Sandbox for GUI {
 
     fn update(&mut self, message: Message) {
         match message {
-            // TODO add more stuff here
+            // TODO: add more stuff here
             Message::SortShips => {
-                (self.backline, self.frontline, self.subline) = find_line(self.map.clone());
-                // TODO use controls to actually sort rather than just putting them in the
-                // lines
-                println!("{:?}", self.frontline[0]);
-                println!("{:?}", self.frontline[1]);
-                println!("{:?}", self.frontline[2]);
 
-                println!("{:?}", self.subline[0]);
-                println!("{:?}", self.subline[1]);
-                println!("{:?}", self.subline[2]);
+                if self.map.len() > 0
+                {
+                    (self.backline, self.frontline, self.subline) = find_line(self.map.clone());
+                    // TODO: use controls to actually sort rather than just putting them in the
+                    // lines
+                    println!("{:?}", self.backline[0]);
+                    println!("{:?}", self.backline[1]);
+                    println!("{:?}", self.backline[2]);
 
-                println!("{:?}", self.frontline[0]);
-                println!("{:?}", self.frontline[1]);
-                println!("{:?}", self.frontline[2]);
+                    for i in 0..3 {
+                        self.backline_img[i] = self.backline[i].retrieve_img();
+                    }
+
+                    println!("{:?}", self.frontline[0]);
+                    println!("{:?}", self.frontline[1]);
+                    println!("{:?}", self.frontline[2]);
+
+                    for i in 0..3 {
+                        self.frontline_img[i] = self.frontline[i].retrieve_img();
+                    }
+
+                    println!("{:?}", self.subline[0]);
+                    println!("{:?}", self.subline[1]);
+                    println!("{:?}", self.subline[2]);
+
+                    for i in 0..3 {
+                        self.subline_img[i] = self.subline[i].retrieve_img();
+                    }
+
+                }
             }
             Message::ImportShips => {
                 self.map = read_ships_from_file("data_export.json").unwrap();
@@ -134,7 +160,7 @@ impl Sandbox for GUI {
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
-        // TODO make the buttons fill the screen
+        // TODO: make the buttons fill the screen
         let controls = column![
             Button::new("Import Ships")
                 .on_press(Message::ImportShips)
@@ -152,20 +178,16 @@ impl Sandbox for GUI {
         .align_items(Alignment::Center)
         .width(Length::Fill);
 
-        let image_test: image::Handle = image::Handle::from_path("test.png");
 
         column![
             controls,
             Checkbox::new("Import All", self.import_all, Message::ImportAllToggle),
             row![
-                image::viewer(image_test.clone()),
-                image::viewer(image_test.clone()),
-                image::viewer(image_test.clone()),
-                pick_list(
-                    &Class::BACK[..],
-                    self.backline_class_filter.clone(),
-                    Message::BacklineClassFilter
-                )
+                text("Backline"),
+                image::viewer(self.backline_img[0].clone()),
+                image::viewer(self.backline_img[1].clone()),
+                image::viewer(self.backline_img[2].clone()),
+                pick_list(&Class::BACK[..], self.backline_class_filter.clone(), Message::BacklineClassFilter)
             ],
             row(SortChoice::all()
                 .iter()
@@ -181,9 +203,10 @@ impl Sandbox for GUI {
                 .map(iced::Element::from)
                 .collect()),
             row![
-                image::viewer(image_test.clone()),
-                image::viewer(image_test.clone()),
-                image::viewer(image_test.clone()),
+                text("Frontline"),
+                image::viewer(self.frontline_img[0].clone()),
+                image::viewer(self.frontline_img[1].clone()),
+                image::viewer(self.frontline_img[2].clone()),
                 pick_list(
                     &Class::FRONT[..],
                     self.frontline_class_filter.clone(),
@@ -204,9 +227,10 @@ impl Sandbox for GUI {
                 .map(iced::Element::from)
                 .collect()),
             row![
-                image::viewer(image_test.clone()),
-                image::viewer(image_test.clone()),
-                image::viewer(image_test.clone()),
+                text("Subline"),
+                image::viewer(self.subline_img[0].clone()),
+                image::viewer(self.subline_img[1].clone()),
+                image::viewer(self.subline_img[2].clone()),
                 pick_list(
                     &Class::SUB[..],
                     self.subline_class_filter.clone(),
@@ -329,6 +353,18 @@ struct Ship {
     image: String,
 }
 
+impl Ship {
+    fn retrieve_img(&self) -> image::Handle {
+
+        // TODO: actually use the image field and download the ship images
+        println!("{}", self.image);
+
+        let image_test: image::Handle = image::Handle::from_path("test.png");
+
+        image_test
+    }
+}
+
 #[derive(EnumString, Debug, Clone, Eq, PartialEq, Copy)]
 enum SortChoice {
     Luck,
@@ -389,7 +425,7 @@ impl From<SortChoice> for String {
     }
 }
 
-// TODO beter handling for improper JSON
+// TODO: beter handling for improper JSON
 #[allow(dead_code)]
 fn read_ships_from_file<P: AsRef<Path>>(path: P) -> Result<HashMap<i32, Ship>, Box<dyn Error>> {
     let file = File::open(path)?;
@@ -567,7 +603,7 @@ fn main() -> iced::Result {
     }
 
     if matches.opt_present("g") {
-        // TODO GUI stuff here
+        // TODO: GUI stuff here
         GUI::run(Settings::default())
     } else {
         loop {
