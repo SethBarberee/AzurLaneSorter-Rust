@@ -1,4 +1,3 @@
-use core::fmt;
 use reqwest;
 use std::collections::HashMap;
 use std::env;
@@ -9,421 +8,51 @@ use std::{
     io::{BufReader, BufWriter, Write},
     str::FromStr,
 };
-use strum_macros::EnumString;
 
 use terminal_menu::{button, label, menu, mut_menu, run};
 
 use getopts::Options;
-use serde::{Deserialize, Serialize};
 
-use iced::widget::button::Button;
-use iced::widget::column;
-use iced::widget::image;
-use iced::widget::radio;
-use iced::widget::{pick_list, row, Checkbox};
-use iced::widget::text;
-use iced::{Sandbox, Settings};
-use iced::Alignment;
-use iced::Length;
+pub mod gui;
+pub mod ship;
+
 
 #[derive(Debug, Clone)]
-enum Message {
-    ImportShips,
-    SortShips,
-    ClearLines,
-    FrontlineSort(SortChoice),
-    BacklineSort(SortChoice),
-    SublineSort(SortChoice),
-    ImportAllToggle(bool),
-    FrontlineClassFilter(Class),
-    BacklineClassFilter(Class),
-    SublineClassFilter(Class),
-}
-
-struct GUI {
+struct MainState {
     map: HashMap<i32, Ship>,
     backline: Vec<Ship>,
     frontline: Vec<Ship>,
     subline: Vec<Ship>,
-    backline_img: Vec<image::Handle>,
-    frontline_img: Vec<image::Handle>,
-    subline_img: Vec<image::Handle>,
-    import_all: bool, // whether to import all or use the include.txt
-    frontline_sort: SortChoice,
-    frontline_class_filter: Option<Class>,
-    backline_sort: SortChoice,
-    backline_class_filter: Option<Class>,
-    subline_sort: SortChoice,
-    subline_class_filter: Option<Class>,
+    // frontline_sort: SortChoice,
+    // frontline_class_filter: Option<Class>,
+    // backline_sort: SortChoice,
+    // backline_class_filter: Option<Class>,
+    // subline_sort: SortChoice,
+    // subline_class_filter: Option<Class>,
 }
 
-impl Sandbox for GUI {
-    type Message = Message;
 
-    fn theme(&self) -> iced::Theme {
-        iced::Theme::Dark
-    }
-
-    fn style(&self) -> iced::theme::Application {
-        iced::theme::Application::default()
-    }
-
-    fn scale_factor(&self) -> f64 {
-        1.0
-    }
-
-    fn run(settings: iced::Settings<()>) -> Result<(), iced::Error>
-    where
-        Self: 'static + Sized,
-    {
-        <Self as iced::Application>::run(settings)
-    }
-
+impl MainState {
     fn new() -> Self {
-        let image_test: image::Handle = image::Handle::from_path("test.png");
-
-        GUI {
-            map: HashMap::new(),
-            backline: Vec::new(),
-            subline: Vec::new(),
-            frontline: Vec::new(),
-            import_all: false,
-            frontline_sort: SortChoice::HP,
-            subline_sort: SortChoice::HP,
-            backline_sort: SortChoice::HP,
-            frontline_class_filter: None,
-            backline_class_filter: None,
-            subline_class_filter: None,
-            backline_img: vec![image_test.clone(); 3],
-            frontline_img: vec![image_test.clone(); 3],
-            subline_img: vec![image_test.clone(); 3],
-        }
+        Self { map: HashMap::new(), backline: Vec::new(), frontline: Vec::new(), subline: Vec::new() }
     }
 
-    fn title(&self) -> String {
-        String::from("Azur Lane Sorter")
+    fn reset_lines(&mut self) {
+        self.frontline = Vec::new();
+        self.backline = Vec::new();
+        self.subline = Vec::new();
     }
 
-    fn update(&mut self, message: Message) {
-        match message {
-            // TODO: add more stuff here
-            Message::SortShips => {
-
-                if self.map.len() > 0
-                {
-                    (self.backline, self.frontline, self.subline) = find_line(self.map.clone());
-                    // TODO: use controls to actually sort rather than just putting them in the
-                    // lines
-                    println!("{:?}", self.backline[0]);
-                    println!("{:?}", self.backline[1]);
-                    println!("{:?}", self.backline[2]);
-
-                    for i in 0..3 {
-                        self.backline_img[i] = self.backline[i].retrieve_img();
-                    }
-
-                    println!("{:?}", self.frontline[0]);
-                    println!("{:?}", self.frontline[1]);
-                    println!("{:?}", self.frontline[2]);
-
-                    for i in 0..3 {
-                        self.frontline_img[i] = self.frontline[i].retrieve_img();
-                    }
-
-                    println!("{:?}", self.subline[0]);
-                    println!("{:?}", self.subline[1]);
-                    println!("{:?}", self.subline[2]);
-
-                    for i in 0..3 {
-                        self.subline_img[i] = self.subline[i].retrieve_img();
-                    }
-
-                }
-            }
-            Message::ImportShips => {
-                self.map = read_ships_from_file("data_export.json").unwrap();
-            }
-            Message::ClearLines => {
-                // Reset the lines but don't clear the map
-                self.backline = Vec::new();
-                self.frontline = Vec::new();
-                self.subline = Vec::new();
-            }
-            Message::FrontlineSort(choice) => self.frontline_sort = choice,
-            Message::BacklineSort(choice) => self.backline_sort = choice,
-            Message::SublineSort(choice) => self.subline_sort = choice,
-            Message::ImportAllToggle(toggle) => self.import_all = toggle,
-            Message::FrontlineClassFilter(class) => self.frontline_class_filter = Some(class),
-            Message::BacklineClassFilter(class) => self.backline_class_filter = Some(class),
-            Message::SublineClassFilter(class) => self.subline_class_filter = Some(class),
-        }
+    fn set_map(mut self, map: HashMap<i32, Ship>) {
+        self.map = map;
     }
 
-    fn view(&self) -> iced::Element<'_, Self::Message> {
-        // TODO: make the buttons fill the screen
-        let controls = column![
-            Button::new("Import Ships")
-                .on_press(Message::ImportShips)
-                .width(Length::Fill)
-                .padding(10),
-            Button::new("Sort Ships")
-                .on_press(Message::SortShips)
-                .width(Length::Fill)
-                .padding(10),
-            Button::new("Clear Lines")
-                .on_press(Message::ClearLines)
-                .width(Length::Fill)
-                .padding(10),
-        ]
-        .align_items(Alignment::Center)
-        .width(Length::Fill);
-
-
-        column![
-            controls,
-            Checkbox::new("Import All", self.import_all, Message::ImportAllToggle),
-            row![
-                text("Backline"),
-                image::viewer(self.backline_img[0].clone()),
-                image::viewer(self.backline_img[1].clone()),
-                image::viewer(self.backline_img[2].clone()),
-                pick_list(&Class::BACK[..], self.backline_class_filter.clone(), Message::BacklineClassFilter)
-            ],
-            row(SortChoice::all()
-                .iter()
-                .copied()
-                .map(|sort_choice| {
-                    radio(
-                        sort_choice,
-                        sort_choice,
-                        Some(self.backline_sort),
-                        Message::BacklineSort,
-                    )
-                })
-                .map(iced::Element::from)
-                .collect()),
-            row![
-                text("Frontline"),
-                image::viewer(self.frontline_img[0].clone()),
-                image::viewer(self.frontline_img[1].clone()),
-                image::viewer(self.frontline_img[2].clone()),
-                pick_list(
-                    &Class::FRONT[..],
-                    self.frontline_class_filter.clone(),
-                    Message::FrontlineClassFilter
-                )
-            ],
-            row(SortChoice::all()
-                .iter()
-                .copied()
-                .map(|sort_choice| {
-                    radio(
-                        sort_choice,
-                        sort_choice,
-                        Some(self.frontline_sort),
-                        Message::FrontlineSort,
-                    )
-                })
-                .map(iced::Element::from)
-                .collect()),
-            row![
-                text("Subline"),
-                image::viewer(self.subline_img[0].clone()),
-                image::viewer(self.subline_img[1].clone()),
-                image::viewer(self.subline_img[2].clone()),
-                pick_list(
-                    &Class::SUB[..],
-                    self.subline_class_filter.clone(),
-                    Message::SublineClassFilter
-                )
-            ],
-            row(SortChoice::all()
-                .iter()
-                .copied()
-                .map(|sort_choice| {
-                    radio(
-                        sort_choice,
-                        sort_choice,
-                        Some(self.subline_sort),
-                        Message::SublineSort,
-                    )
-                })
-                .map(iced::Element::from)
-                .collect())
-        ]
-        .into()
+    fn get_map(&self) -> &HashMap<i32, Ship> {
+        &self.map
     }
 }
 
-#[derive(Debug, PartialEq, EnumString, Deserialize, Serialize, Clone, Eq, PartialOrd, Ord)]
-enum Armor {
-    Heavy,
-    Medium,
-    Light,
-}
-
-#[derive(Debug, PartialEq, EnumString, Deserialize, Serialize, Clone, Eq, PartialOrd, Ord)]
-enum Class {
-    BB,
-    BBV,
-    BC,
-    BM,
-    CV,
-    CVL,
-    AR,
-    AE,
-    CL,
-    CA,
-    CB,
-    DD,
-    SS,
-    AM,
-    SSV,
-    IX,
-}
-
-impl fmt::Display for Class {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Class::BB => write!(f, "BB"),
-            Class::BBV => write!(f, "BBV"),
-            Class::BC => write!(f, "BBC"),
-            Class::BM => write!(f, "BM"),
-            Class::CV => write!(f, "CV"),
-            Class::CVL => write!(f, "CVL"),
-            Class::AR => write!(f, "AR"),
-            Class::AE => write!(f, "AE"),
-            Class::CL => write!(f, "CL"),
-            Class::CA => write!(f, "CA"),
-            Class::CB => write!(f, "CB"),
-            Class::DD => write!(f, "DD"),
-            Class::SS => write!(f, "SS"),
-            Class::AM => write!(f, "AM"),
-            Class::SSV => write!(f, "SSV"),
-            Class::IX => write!(f, "IX"),
-        }
-    }
-}
-
-impl Class {
-    const SUB: [Class; 4] = [Class::SS, Class::AM, Class::SSV, Class::IX];
-    const FRONT: [Class; 4] = [Class::CL, Class::CA, Class::CB, Class::DD];
-    const BACK: [Class; 8] = [
-        Class::BB,
-        Class::BBV,
-        Class::BC,
-        Class::BM,
-        Class::CV,
-        Class::CVL,
-        Class::AR,
-        Class::AE,
-    ];
-}
-
-#[derive(Debug, PartialEq, EnumString, Deserialize, Serialize, Clone)]
-enum ValidLevel {
-    Level1,
-    Level100,
-    Level120,
-    Level125,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
-struct Ship {
-    id: String,
-    name: String,
-    rarity: String,
-    nation: String,
-    class: Class,
-    luck: i32,
-    armor: Armor,
-    speed: i32,
-    hp: i32,
-    firepower: i32,
-    antiair: i32,
-    torpedo: i32,
-    evasion: i32,
-    aviation: i32,
-    cost: i32,
-    reload: i32,
-    antisubmarine: i32,
-    oxygen: i32,
-    ammunition: i32,
-    accuracy: i32,
-    image: String,
-}
-
-impl Ship {
-    fn retrieve_img(&self) -> image::Handle {
-
-        // TODO: actually use the image field and download the ship images
-        println!("{}", self.image);
-
-        let image_test: image::Handle = image::Handle::from_path("test.png");
-
-        image_test
-    }
-}
-
-#[derive(EnumString, Debug, Clone, Eq, PartialEq, Copy)]
-enum SortChoice {
-    Luck,
-    Armor,
-    Speed,
-    HP,
-    Firepower,
-    AntiAir,
-    Torpedo,
-    Evasion,
-    Cost,
-    Reload,
-    AntiSubmarine,
-    Oxygen,
-    Ammunition,
-    Accuracy,
-}
-
-impl SortChoice {
-    fn all() -> [SortChoice; 14] {
-        [
-            SortChoice::HP,
-            SortChoice::Luck,
-            SortChoice::Armor,
-            SortChoice::Speed,
-            SortChoice::Firepower,
-            SortChoice::AntiAir,
-            SortChoice::Torpedo,
-            SortChoice::Evasion,
-            SortChoice::Cost,
-            SortChoice::Reload,
-            SortChoice::AntiSubmarine,
-            SortChoice::Oxygen,
-            SortChoice::Ammunition,
-            SortChoice::Accuracy,
-        ]
-    }
-}
-
-impl From<SortChoice> for String {
-    fn from(sort_choice: SortChoice) -> String {
-        String::from(match sort_choice {
-            SortChoice::HP => "HP",
-            SortChoice::Luck => "Luck",
-            SortChoice::Armor => "Armor",
-            SortChoice::Speed => "Speed",
-            SortChoice::Firepower => "Firepower",
-            SortChoice::AntiAir => "AntiAir",
-            SortChoice::Torpedo => "Torpedo",
-            SortChoice::Evasion => "Evasion",
-            SortChoice::Cost => "Cost",
-            SortChoice::Reload => "Reload",
-            SortChoice::AntiSubmarine => "AntiSubmarine",
-            SortChoice::Oxygen => "Oxygen",
-            SortChoice::Ammunition => "Ammunition",
-            SortChoice::Accuracy => "Accuracy",
-        })
-    }
-}
+use crate::ship::*;
 
 // TODO: beter handling for improper JSON
 #[allow(dead_code)]
@@ -466,7 +95,7 @@ fn sort_ships(line: &mut Vec<Ship>, choice: SortChoice) -> &Vec<Ship> {
     line
 }
 
-fn find_line(map: HashMap<i32, Ship>) -> (Vec<Ship>, Vec<Ship>, Vec<Ship>) {
+fn find_line(map: &HashMap<i32, Ship>) -> (Vec<Ship>, Vec<Ship>, Vec<Ship>) {
     let mut backline = Vec::new();
     let mut frontline = Vec::new();
     let mut subline = Vec::new();
@@ -480,18 +109,21 @@ fn find_line(map: HashMap<i32, Ship>) -> (Vec<Ship>, Vec<Ship>, Vec<Ship>) {
             | Class::CV
             | Class::CVL
             | Class::AR
-            | Class::AE => backline.push(ship),
-            Class::CA | Class::CB | Class::CL | Class::DD => frontline.push(ship),
-            Class::SS | Class::AM | Class::SSV | Class::IX => subline.push(ship),
+            | Class::AE => backline.push(ship.clone()),
+            Class::CA | Class::CB | Class::CL | Class::DD => frontline.push(ship.clone()),
+            Class::SS | Class::AM | Class::SSV | Class::IX => subline.push(ship.clone()),
         }
     }
     (backline, frontline, subline)
 }
 
 #[allow(dead_code)]
-fn scrape_wiki(map: &mut HashMap<i32, Ship>, level: i32) -> Result<(), Box<dyn Error>> {
+fn scrape_wiki(level: i32) -> Result<HashMap<i32, Ship>, Box<dyn Error>> {
     let azur_wiki_url = "https://azurlane.koumakan.jp/wiki/List_of_Ships_by_Stats";
     let response = reqwest::blocking::get(azur_wiki_url)?.text()?;
+
+
+    let mut map = HashMap::new();
 
     let wiki = response; // full response from wiki
     let mut count = 0;
@@ -568,7 +200,7 @@ fn scrape_wiki(map: &mut HashMap<i32, Ship>, level: i32) -> Result<(), Box<dyn E
             };
         }
     }
-    Ok(())
+    Ok(map)
 }
 
 #[allow(dead_code)]
@@ -603,16 +235,20 @@ fn main() -> iced::Result {
     }
 
     if matches.opt_present("g") {
-        // TODO: GUI stuff here
-        GUI::run(Settings::default())
+       let gui_azur = gui::GUI::new();
+       gui_azur.start()
     } else {
         loop {
-            let mut map: HashMap<i32, Ship> = HashMap::new();
+
+            let mut state = MainState::new();
+            state.reset_lines();
+
             let main_menu = menu(vec![
                 label("1) Read Ships into program"),
                 label("2) Scrape wiki"),
                 button("1"),
                 button("2"),
+
                 button("Quit"),
             ]);
 
@@ -620,8 +256,10 @@ fn main() -> iced::Result {
 
             match mut_menu(&main_menu).selected_item_name() {
                 "1" => {
-                    map = read_ships_from_file("data_export.json").unwrap();
-                    let (backline, frontline, subline) = find_line(map);
+                    let map3 = read_ships_from_file("data_export.json").unwrap();
+
+                    state.set_map(map3.clone());
+                    let (backline, frontline, subline) = find_line(&map3);
 
                     for mut vec in [backline, frontline, subline] {
                         let selection_menu = menu(vec![
@@ -649,9 +287,9 @@ fn main() -> iced::Result {
                                 .unwrap(),
                         );
 
-                        println!("{:?}", vec[0]);
-                        println!("{:?}", vec[1]);
-                        println!("{:?}", vec[2]);
+                        println!("{}", vec[0]);
+                        println!("{}", vec[1]);
+                        println!("{}", vec[2]);
                     }
                 }
                 "2" => {
@@ -674,8 +312,9 @@ fn main() -> iced::Result {
                             ValidLevel::Level125 => 125,
                         };
 
-                    let _ = scrape_wiki(&mut map, level);
-                    let (mut backline, mut frontline, mut subline) = find_line(map);
+                    let map2 = scrape_wiki(level).unwrap();
+                    state.set_map(map2.clone());
+                    let (mut backline, mut frontline, mut subline) = find_line(&map2);
                     let all_lines = &mut backline;
                     all_lines.append(&mut frontline);
                     all_lines.append(&mut subline);
