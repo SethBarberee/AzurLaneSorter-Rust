@@ -43,7 +43,7 @@ impl MainState {
         self.subline = Vec::new();
     }
 
-    fn set_map(mut self, map: HashMap<i32, Ship>) {
+    fn set_map(&mut self, map: HashMap<i32, Ship>) {
         self.map = map;
     }
 
@@ -238,16 +238,19 @@ fn main() -> iced::Result {
        let gui_azur = gui::GUI::new();
        gui_azur.start()
     } else {
-        loop {
 
-            let mut state = MainState::new();
-            state.reset_lines();
+        let mut state = MainState::new();
+        state.reset_lines();
+
+        loop {
 
             let main_menu = menu(vec![
                 label("1) Read Ships into program"),
-                label("2) Scrape wiki"),
+                label("2) Sort Ships"),
+                label("3) Scrape wiki"),
                 button("1"),
                 button("2"),
+                button("3"),
 
                 button("Quit"),
             ]);
@@ -257,12 +260,14 @@ fn main() -> iced::Result {
             match mut_menu(&main_menu).selected_item_name() {
                 "1" => {
                     let map3 = read_ships_from_file("data_export.json").unwrap();
+                    state.set_map(map3); 
+                }
+                "2" => {
+                    let (backline, frontline, subline) = find_line(state.get_map());
 
-                    state.set_map(map3.clone());
-                    let (backline, frontline, subline) = find_line(&map3);
-
-                    for mut vec in [backline, frontline, subline] {
+                    for mut line in [backline, frontline, subline] {
                         let selection_menu = menu(vec![
+                            label("Select Stat to Sort by:"),
                             button("Luck"),
                             button("Armor"),
                             button("Speed"),
@@ -282,17 +287,17 @@ fn main() -> iced::Result {
                         run(&selection_menu);
 
                         sort_ships(
-                            &mut vec,
+                            &mut line,
                             SortChoice::from_str(mut_menu(&selection_menu).selected_item_name())
                                 .unwrap(),
                         );
 
-                        println!("{}", vec[0]);
-                        println!("{}", vec[1]);
-                        println!("{}", vec[2]);
+                        println!("{}", line[0]);
+                        println!("{}", line[1]);
+                        println!("{}", line[2]);
                     }
                 }
-                "2" => {
+                "3" => {
                     let wiki_menu = menu(vec![
                         button("Level1"),
                         button("Level100"),
@@ -313,12 +318,13 @@ fn main() -> iced::Result {
                         };
 
                     let map2 = scrape_wiki(level).unwrap();
-                    state.set_map(map2.clone());
-                    let (mut backline, mut frontline, mut subline) = find_line(&map2);
+                    state.set_map(map2);
+                    let (mut backline, mut frontline, mut subline) = find_line(state.get_map());
                     let all_lines = &mut backline;
                     all_lines.append(&mut frontline);
                     all_lines.append(&mut subline);
                     let _ = export_json("data_export.json", all_lines);
+
                 }
                 "Quit" => {
                     break;
