@@ -16,6 +16,7 @@ use getopts::Options;
 pub mod gui;
 pub mod ship;
 
+use crate::ship::*;
 
 #[derive(Debug, Clone)]
 struct MainState {
@@ -52,8 +53,6 @@ impl MainState {
     }
 }
 
-use crate::ship::*;
-
 // TODO: beter handling for improper JSON
 #[allow(dead_code)]
 fn read_ships_from_file<P: AsRef<Path>>(path: P) -> Result<HashMap<i32, Ship>, Box<dyn Error>> {
@@ -74,7 +73,7 @@ fn read_ships_from_file<P: AsRef<Path>>(path: P) -> Result<HashMap<i32, Ship>, B
     Ok(map)
 }
 
-fn sort_ships(line: &mut Vec<Ship>, choice: SortChoice) -> &Vec<Ship> {
+fn sort_ships(line: &mut Vec<Ship>, choice: SortChoice) {
     match choice {
         SortChoice::HP => line.sort_by(|a, b| b.hp.cmp(&a.hp)),
         SortChoice::Luck => line.sort_by(|a, b| b.luck.cmp(&a.luck)),
@@ -91,8 +90,6 @@ fn sort_ships(line: &mut Vec<Ship>, choice: SortChoice) -> &Vec<Ship> {
         SortChoice::Ammunition => line.sort_by(|a, b| b.ammunition.cmp(&a.ammunition)),
         SortChoice::Accuracy => line.sort_by(|a, b| b.accuracy.cmp(&a.accuracy)),
     }
-
-    line
 }
 
 fn find_line(map: &HashMap<i32, Ship>) -> (Vec<Ship>, Vec<Ship>, Vec<Ship>) {
@@ -111,13 +108,16 @@ fn find_line(map: &HashMap<i32, Ship>) -> (Vec<Ship>, Vec<Ship>, Vec<Ship>) {
             | Class::AR
             | Class::AE => backline.push(ship.clone()),
             Class::CA | Class::CB | Class::CL | Class::DD => frontline.push(ship.clone()),
-            Class::SS | Class::AM | Class::SSV | Class::IX => subline.push(ship.clone()),
+            Class::SS | Class::AM | Class::SSV | Class::IX | Class::IXs  | Class::IXv | Class::IXm  => subline.push(ship.clone()),
         }
     }
     (backline, frontline, subline)
 }
 
-#[allow(dead_code)]
+fn filter_line_class(line: &Vec<Ship>, filter: Class) -> Vec<&Ship> { line.iter().filter(|x| x.class == filter).collect() }
+
+fn filter_line_armor(line: &Vec<Ship>, filter: Armor) -> Vec<&Ship> { line.iter().filter(|x| x.armor == filter).collect() }
+
 fn scrape_wiki(level: i32) -> Result<HashMap<i32, Ship>, Box<dyn Error>> {
     let azur_wiki_url = "https://azurlane.koumakan.jp/wiki/List_of_Ships_by_Stats";
     let response = reqwest::blocking::get(azur_wiki_url)?.text()?;
