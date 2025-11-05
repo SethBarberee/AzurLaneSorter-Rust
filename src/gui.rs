@@ -197,7 +197,7 @@ impl Sandbox for GUI {
 
         column![
             controls,
-            Checkbox::new("Import All", self.import_all, Message::ImportAllToggle),
+            Checkbox::new("Import All", self.import_all).on_toggle(Message::ImportAllToggle),
             row![
                 text("Backline"),
                 image::viewer(self.backline_img[0].clone()),
@@ -220,7 +220,7 @@ impl Sandbox for GUI {
                     )
                 })
                 .map(iced::Element::from)
-                .collect()),
+                .collect::<Vec<_>>()),
             row![
                 text("Frontline"),
                 image::viewer(self.frontline_img[0].clone()),
@@ -244,7 +244,7 @@ impl Sandbox for GUI {
                     )
                 })
                 .map(iced::Element::from)
-                .collect()),
+                .collect::<Vec<_>>()),
             row![
                 text("Subline"),
                 image::viewer(self.subline_img[0].clone()),
@@ -268,7 +268,7 @@ impl Sandbox for GUI {
                     )
                 })
                 .map(iced::Element::from)
-                .collect())
+                .collect::<Vec<_>>()),
         ]
         .into()
     }
